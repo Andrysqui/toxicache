@@ -4,7 +4,7 @@ Golang scanner to find web cache poisoning vulnerabilities in a list of URLs and
 ## Install
 
 ```bash
-go install github.com/xhzeem/toxicache@latest
+go install github.com/Andrysqui/toxicache@latest
 ```
 
 ## Flags
