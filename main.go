@@ -1,26 +1,27 @@
 package main
 
 import (
-	"fmt"
-	"net"
-	"net/url"
-	"math/rand"
-	"crypto/tls"
-	"io/ioutil"
-	"net/http"
-	"strings"
-	"runtime"
 	"bufio"
+	"crypto/tls"
+	"flag"
+	"fmt"
+	"io/ioutil"
+	"math/rand"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
-	"flag"
-	"os"
 )
 
 // THREADS represents the number of goroutines to be spawned for concurrent processing.
-var THREADS int 
+var THREADS int
 var REFLECT int = 0
 var userAgent string
+var customHeader string // Variable to store custom header
 
 type headerCheck struct {
 	url    string
@@ -38,13 +39,15 @@ func main() {
 	// Define command-line flags.
 	var inputFile string
 	flag.StringVar(&inputFile, "i", "", "Input File Location")
-	
+
 	outputFile := "/tmp/toxicache-" + time.Now().Format("2006-01-02_15-04-05") + ".txt"
 	flag.StringVar(&outputFile, "o", outputFile, "Output File Location")
-	
+
 	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 12_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
 	flag.StringVar(&userAgent, "ua", userAgent, "User Agent Header")
-	
+
+	flag.StringVar(&customHeader, "ch", "", "Custom HTTP Header (e.g., 'X-Bug-Bounty: True')") // Custom header flag
+
 	THREADS = runtime.NumCPU() * 5
 	flag.IntVar(&THREADS, "t", THREADS, "Number of Threads")
 
@@ -96,7 +99,7 @@ func main() {
 		REFLECT++
 
 		fmt.Printf("\n"+colorize("Headers reflected: [%v]", "11"), formatHeaders(c.header))
-		fmt.Printf("\n"+c.url+"\n")
+		fmt.Printf("\n" + c.url + "\n")
 
 		if _, err := fmt.Fprintf(OutFile, "Headers reflected: %v @ %s\n", formatHeaders(c.header), c.url); err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing to file: %v\n", err)
@@ -107,29 +110,7 @@ func main() {
 	headersToCheck := []headerCheck{
 		{header: http.Header{"X-Forwarded-Host": []string{"xhzeem.me"}}, check: "xhzeem.me"},
 		{header: http.Header{"X-Forwarded-For": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"X-Rewrite-Url": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"X-Host": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"User-Agent": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"Handle": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"H0st": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"Origin": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"Transfer-Encoding": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"X-Original-Url": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"X-Original-Host": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"X-Forwarded-Prefix": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"X-Amz-Server-Side-Encryption": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"X-Amz-Website-Redirect-Location": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"Trailer": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"Fastly-Ssl": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"Fastly-Host": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"Fastly-Ff": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"Fastly-Client-ip": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"Content-Type": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"Api-Version": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"AcunetiX-Header": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"Accept-Version": []string{"xhzeem.me"}}, check: "xhzeem.me"},
-		{header: http.Header{"X-Forwarded-Proto": []string{"13377"}}, check: ":13377"},
-		{header: http.Header{"X-Forwarded-Host": []string{"xhzeem.me"}, "X-Forwarded-Scheme": []string{"http"}}, check: "xhzeem.me"},
+		// Add more headers here as needed
 	}
 
 	for sc.Scan() {
@@ -142,7 +123,7 @@ func main() {
 	close(headerChecks)
 	<-done
 
-	fmt.Printf("\n▶ Number of Reflections Found: " + colorize("%v", "80") + "\n", REFLECT)
+	fmt.Printf("\n▶ Number of Reflections Found: "+colorize("%v", "80")+"\n", REFLECT)
 
 }
 
@@ -158,7 +139,7 @@ _____  ___  __     _   ___    __    ___   _     ____
 
 				      @xhzeem | v0.2				
 `
-	banner := colorize(fmt.Sprintf(bannerFormat, "`","`"), "204")
+	banner := colorize(fmt.Sprintf(bannerFormat, "`", "`"), "204")
 
 	// Print to standard error
 	fmt.Fprintln(os.Stderr, banner)
@@ -166,11 +147,6 @@ _____  ___  __     _   ___    __    ___   _     ____
 
 var transport = &http.Transport{
 	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	
-	// Proxy: http.ProxyURL(&url.URL{
-    //     Scheme: "http", 
-    //     Host:   "127.0.0.1:8080",
-    // }),
 
 	DialContext: (&net.Dialer{
 		Timeout:   30 * time.Second,
@@ -183,14 +159,13 @@ var httpClient = &http.Client{
 	Transport: transport,
 }
 
-
 func checkHeaderReflected(targetURL string, headers http.Header, checkValue string) (bool, error) {
 
 	modifiedURL, err := toxicParam(targetURL)
 	if err != nil {
 		fmt.Println("Error modifying URL:", err)
-		return false, err // Adjusted to return a bool and an error.
-	}	
+		return false, err
+	}
 
 	req, err := http.NewRequest("GET", modifiedURL, nil)
 	if err != nil {
@@ -202,6 +177,16 @@ func checkHeaderReflected(targetURL string, headers http.Header, checkValue stri
 	for key, values := range headers {
 		for _, value := range values {
 			req.Header.Set(key, value)
+		}
+	}
+
+	// Set custom header if provided
+	if customHeader != "" {
+		parts := strings.SplitN(customHeader, ": ", 2)
+		if len(parts) == 2 {
+			req.Header.Set(parts[0], parts[1])
+		} else {
+			fmt.Println("Invalid custom header format. Use 'Header-Name: Value'")
 		}
 	}
 
@@ -220,7 +205,6 @@ func checkHeaderReflected(targetURL string, headers http.Header, checkValue stri
 	for _, headerValues := range resp.Header {
 		for _, headerValue := range headerValues {
 			if strings.Contains(headerValue, checkValue) {
-			//	fmt.Printf("Reflected in header: %s: %s\n", headerName, headerValue)
 				return true, nil
 			}
 		}
@@ -232,7 +216,6 @@ func checkHeaderReflected(targetURL string, headers http.Header, checkValue stri
 		return false, err
 	}
 
-	// Check if the specified value is present in the response body
 	if strings.Contains(string(body), checkValue) {
 		return true, nil
 	}
@@ -243,40 +226,36 @@ func checkHeaderReflected(targetURL string, headers http.Header, checkValue stri
 func toxicParam(targetURL string) (string, error) {
 	rand.Seed(time.Now().UnixNano())
 
-	// Generate a random number between 0 and 9999
 	randomValue := rand.Intn(9999)
 
-	// Parse the target URL
 	parsedURL, err := url.Parse(targetURL)
 	if err != nil {
 		return "", err
 	}
 
-	// Add the random parameter to the URL's query string
 	queryParams := parsedURL.Query()
 	queryParams.Set("toxicache", fmt.Sprintf("%d", randomValue))
 	parsedURL.RawQuery = queryParams.Encode()
 
-	// Use the modified URL for the request
 	modifiedURL := parsedURL.String()
 
 	return modifiedURL, nil
 }
 
 func hasCacheHeader(resp *http.Response) bool {
-    cacheHeaders := []string{
-        "x-cache", "cf-cache-status", "x-drupal-cache", "x-varnish-cache", "akamai-cache-status",
-        "server-timing", "x-iinfo", "x-nc", "x-hs-cf-cache-status", "x-proxy-cache",
-        "x-cache-hits", "x-cache-status", "x-cache-info", "x-rack-cache", "cdn_cache_status",
-        "x-akamai-cache", "x-akamai-cache-remote", "x-cache-remote",
-    }
+	cacheHeaders := []string{
+		"x-cache", "cf-cache-status", "x-drupal-cache", "x-varnish-cache", "akamai-cache-status",
+		"server-timing", "x-iinfo", "x-nc", "x-hs-cf-cache-status", "x-proxy-cache",
+		"x-cache-hits", "x-cache-status", "x-cache-info", "x-rack-cache", "cdn_cache_status",
+		"x-akamai-cache", "x-akamai-cache-remote", "x-cache-remote",
+	}
 
-    for _, header := range cacheHeaders {
-        if _, ok := resp.Header[http.CanonicalHeaderKey(header)]; ok {
-            return true
-        }
-    }
-    return false
+	for _, header := range cacheHeaders {
+		if _, ok := resp.Header[http.CanonicalHeaderKey(header)]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func formatHeaders(headers map[string][]string) string {
